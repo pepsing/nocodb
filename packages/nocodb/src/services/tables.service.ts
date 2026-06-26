@@ -33,6 +33,7 @@ import { NcContext } from '~/interface/config';
 import { ColumnsService } from '~/services/columns.service';
 import { LinkPlaceholderService } from '~/services/link-placeholder.service';
 import { MetaDiffsService } from '~/services/meta-diffs.service';
+import { ProjectFoldersService } from '~/services/project-folders.service';
 import {
   hasDefaultTableVisibility,
   hasTableVisibilityAccess,
@@ -75,6 +76,7 @@ export class TablesService {
     protected readonly columnsService: ColumnsService,
     protected readonly linkPlaceholderService: LinkPlaceholderService,
     protected readonly metaDependencyEventHandler: MetaDependencyEventHandler,
+    protected readonly projectFoldersService: ProjectFoldersService,
   ) {}
 
   async tableUpdate(
@@ -101,6 +103,43 @@ export class TablesService {
 
     if (model.base_id !== base.id) {
       NcError.get(context).invalidRequestBody('Model does not belong to base');
+    }
+
+    const updateKeys = Object.keys(param.table);
+    const isFolderOnlyUpdate =
+      'fk_folder_id' in param.table &&
+      updateKeys.every((key) => ['fk_folder_id', 'base_id'].includes(key));
+
+    if (isFolderOnlyUpdate) {
+      await this.projectFoldersService.validateTableFolder(context, {
+        baseId: base.id,
+        table: model,
+        folderId: param.table.fk_folder_id,
+      });
+
+      await Model.updateFolder(
+        context,
+        param.tableId,
+        param.table.fk_folder_id ?? null,
+      );
+
+      const table = await Model.getWithInfo(context, {
+        id: model.id,
+      });
+
+      NocoSocket.broadcastEvent(
+        context,
+        {
+          event: EventType.META_EVENT,
+          payload: {
+            action: 'table_update',
+            payload: table,
+          },
+        },
+        context.socket_id,
+      );
+
+      return true;
     }
 
     // if meta/description present update and return
@@ -864,6 +903,12 @@ export class TablesService {
     if (param.sourceId) {
       source = base.sources.find((b) => b.id === param.sourceId);
     }
+
+    await this.projectFoldersService.validateFolderForSource(context, {
+      baseId: base.id,
+      sourceId: source?.id,
+      folderId: tableCreatePayLoad.fk_folder_id,
+    });
 
     if (!param.isDuplicateOperation) {
       // add CreatedTime and LastModifiedTime system columns if missing in request payload

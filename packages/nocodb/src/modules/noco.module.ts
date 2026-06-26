@@ -58,6 +58,7 @@ import { OrgLicenseController } from '~/controllers/org-license.controller';
 import { OrgTokensController } from '~/controllers/org-tokens.controller';
 import { OrgUsersController } from '~/controllers/org-users.controller';
 import { PluginsController } from '~/controllers/plugins.controller';
+import { ProjectFoldersController } from '~/controllers/project-folders.controller';
 import { PublicMetasController } from '~/controllers/public-metas.controller';
 import { SharedBasesController } from '~/controllers/shared-bases.controller';
 import { SortsController } from '~/controllers/sorts.controller';
@@ -102,6 +103,7 @@ import { OrgTokensEeService } from '~/services/org-tokens-ee.service';
 import { OrgTokensService } from '~/services/org-tokens.service';
 import { OrgUsersService } from '~/services/org-users.service';
 import { PluginsService } from '~/services/plugins.service';
+import { ProjectFoldersService } from '~/services/project-folders.service';
 import { PublicMetasService } from '~/services/public-metas.service';
 import { SharedBasesService } from '~/services/shared-bases.service';
 import { SortsService } from '~/services/sorts.service';
@@ -222,6 +224,7 @@ export const nocoModuleMetadata = {
           OrgTokensController,
           OrgUsersController,
           PluginsController,
+          ProjectFoldersController,
           BaseUsersController,
           BasesController,
           PublicMetasController,
@@ -310,6 +313,7 @@ export const nocoModuleMetadata = {
     OrgTokensService,
     OrgUsersService,
     PluginsService,
+    ProjectFoldersService,
     BaseUsersService,
     BaseMembersV3Service,
     BasesService,

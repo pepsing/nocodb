@@ -36,6 +36,7 @@ import {
   NC_DISABLE_SUPPORT_CHAT,
 } from '~/utils/nc-config';
 import NocoCache from '~/cache/NocoCache';
+import { CorporateSsoService } from '~/modules/auth/corporate-sso.service';
 
 const versionCache = {
   releaseVersion: null,
@@ -445,6 +446,7 @@ export class UtilsService {
     const samlProviderName = samlAuthEnabled
       ? process.env.NC_SSO_SAML_PROVIDER_NAME ?? 'SAML'
       : null;
+    const corporateSsoInfo = new CorporateSsoService().publicInfo(param.req);
 
     const result = {
       authType: 'jwt',
@@ -498,6 +500,7 @@ export class UtilsService {
       restrictWorkspaceCreation: settings.restrict_workspace_creation,
       samlProviderName,
       samlAuthEnabled,
+      ...corporateSsoInfo,
       giftUrl,
       prodReady: Noco.getConfig()?.meta?.db?.client !== DriverClient.SQLITE,
       allowLocalUrl:

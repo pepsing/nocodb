@@ -33,6 +33,10 @@ const permissionScopes = {
     'apiTokenUpdate',
     'apiTokenDelete',
 
+    // Corporate SSO
+    'corporateSsoMappingList',
+    'corporateSsoMappingUpsert',
+
     'oAuthAuthorizationList',
     'oAuthAuthorizationRevoke',
     'oAuthClientRegenerateSecret',
@@ -855,6 +859,8 @@ const permissionDescriptions: Record<string, string> = {
   apiTokenCreate: 'create a new API token',
   apiTokenUpdate: 'update an API token',
   apiTokenDelete: 'delete an API token',
+  corporateSsoMappingList: 'view corporate SSO user mappings',
+  corporateSsoMappingUpsert: 'create or update corporate SSO user mappings',
 
   passwordChange: 'change your password',
   mfaSetup: 'set up two-factor authentication',

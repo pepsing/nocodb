@@ -96,6 +96,8 @@ export enum MetaTable {
   OAUTH_CLIENTS = 'nc_oauth_clients',
   OAUTH_AUTHORIZATION_CODES = 'nc_oauth_authorization_codes',
   OAUTH_TOKENS = 'nc_oauth_tokens',
+  CORP_IDENTITY_MAPPINGS = 'nc_corp_identity_mappings',
+  PROJECT_FOLDERS = 'nc_project_folders',
 
   LAYOUT = 'nc_ds_layout_v2',
   WIDGET = 'nc_ds_widget_v2',
@@ -191,6 +193,7 @@ export const BaseRelatedMetaTables = [
   MetaTable.LIST_VIEW,
   MetaTable.DATE_DEPENDENCY,
   MetaTable.MCP_TOKENS,
+  MetaTable.PROJECT_FOLDERS,
   MetaTable.MODELS,
   MetaTable.PERMISSIONS,
   MetaTable.PERMISSION_SUBJECTS,
@@ -343,6 +346,7 @@ export const orderedMetaTables = [
   MetaTable.DOC_REVISIONS,
   MetaTable.DOCS,
   MetaTable.DOC_CONTENT,
+  MetaTable.PROJECT_FOLDERS,
   MetaTable.MODELS,
 
   // Dashboard / Widget
@@ -633,6 +637,7 @@ export const RootScopeTables = {
     MetaTable.OAUTH_CLIENTS,
     MetaTable.OAUTH_AUTHORIZATION_CODES,
     MetaTable.OAUTH_TOKENS,
+    MetaTable.CORP_IDENTITY_MAPPINGS,
     MetaTable.TEAMS,
     MetaTable.BOOKMARK_GROUPS,
     MetaTable.BOOKMARKS,

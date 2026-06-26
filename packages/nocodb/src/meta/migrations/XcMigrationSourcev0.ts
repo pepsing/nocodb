@@ -72,6 +72,9 @@ import * as nc_202606040000_soft_delete_syncs from './v0/nc_202606040000_soft_de
 import * as nc_202606091200_addons from './v0/nc_202606091200_addons';
 import * as nc_202606121400_detach_suspended_sync_mappings from './v0/nc_202606121400_detach_suspended_sync_mappings';
 import * as nc_202606161200_add_enabled_to_sort from './v0/nc_202606161200_add_enabled_to_sort';
+import * as nc_202606250000_corp_identity_mappings from './v0/nc_202606250000_corp_identity_mappings';
+import * as nc_202606260000_corp_identity_employee_unique from './v0/nc_202606260000_corp_identity_employee_unique';
+import * as nc_202606270000_project_folders from './v0/nc_202606270000_project_folders';
 
 // Create a custom migration source class
 export default class XcMigrationSourcev0 {
@@ -155,6 +158,9 @@ export default class XcMigrationSourcev0 {
       'nc_202606091200_addons',
       'nc_202606121400_detach_suspended_sync_mappings',
       'nc_202606161200_add_enabled_to_sort',
+      'nc_202606250000_corp_identity_mappings',
+      'nc_202606260000_corp_identity_employee_unique',
+      'nc_202606270000_project_folders',
     ]);
   }
 
@@ -312,6 +318,12 @@ export default class XcMigrationSourcev0 {
         return nc_202606121400_detach_suspended_sync_mappings;
       case 'nc_202606161200_add_enabled_to_sort':
         return nc_202606161200_add_enabled_to_sort;
+      case 'nc_202606250000_corp_identity_mappings':
+        return nc_202606250000_corp_identity_mappings;
+      case 'nc_202606260000_corp_identity_employee_unique':
+        return nc_202606260000_corp_identity_employee_unique;
+      case 'nc_202606270000_project_folders':
+        return nc_202606270000_project_folders;
     }
   }
 }

@@ -24,6 +24,20 @@ const formValidator = ref()
 
 const subscribe = ref(false)
 
+const showEmailAuth = computed(() => !appInfo.value.disableEmailAuth && !appInfo.value.corporateSsoHideEmailAuth)
+const corporateSsoLoginUrl = computed(() => {
+  const url = new URL(appInfo.value.corporateSsoLoginUrl || `${appInfo.value.ncSiteUrl}/auth/corporate`, appInfo.value.ncSiteUrl)
+  const nextPath = Array.isArray(route.query.continueAfterSignIn)
+    ? route.query.continueAfterSignIn[0]
+    : route.query.continueAfterSignIn
+
+  if (nextPath) {
+    url.searchParams.set('next', nextPath)
+  }
+
+  return url.toString()
+})
+
 const form = reactive({
   email: '',
   password: '',
@@ -156,7 +170,7 @@ onMounted(async () => {
           </h2>
 
           <a-form ref="formValidator" :model="form" layout="vertical" no-style @finish="signUp">
-            <template v-if="!appInfo.disableEmailAuth">
+            <template v-if="showEmailAuth">
               <Transition name="layout">
                 <div
                   v-if="error"
@@ -193,7 +207,7 @@ onMounted(async () => {
               </a-form-item>
             </template>
             <div class="self-center flex flex-col flex-wrap gap-4 items-center mt-4">
-              <template v-if="!appInfo.disableEmailAuth">
+              <template v-if="showEmailAuth">
                 <button class="scaling-btn bg-opacity-100" type="submit">
                   <span class="flex items-center gap-2">
                     <MaterialSymbolsRocketLaunchOutline />
@@ -202,6 +216,17 @@ onMounted(async () => {
                   </span>
                 </button>
               </template>
+              <a
+                v-if="appInfo.corporateSsoAuthEnabled"
+                :href="corporateSsoLoginUrl"
+                class="scaling-btn bg-opacity-100 after:(!bg-nc-bg-default) !text-primary !no-underline"
+              >
+                <span class="flex items-center gap-2">
+                  <MdiLogin />
+
+                  {{ $t('labels.signInWithProvider', { provider: appInfo.corporateSsoProviderName || 'Company Login' }) }}
+                </span>
+              </a>
               <a
                 v-if="appInfo.googleAuthEnabled"
                 :href="`${appInfo.ncSiteUrl}/auth/google`"
@@ -222,7 +247,7 @@ onMounted(async () => {
                   <button type="button" class="scaling-btn bg-opacity-100">
                     <span class="flex items-center gap-2">
                       <MdiLogin />
-                      <template v-if="!appInfo.disableEmailAuth">
+                      <template v-if="showEmailAuth">
                         {{ $t('labels.signUpWithProvider', { provider: appInfo.oidcProviderName || 'OpenID Connect' }) }}
                       </template>
                       <template v-else>
@@ -233,7 +258,7 @@ onMounted(async () => {
                 </a>
               </div>
 
-              <div v-if="!appInfo.disableEmailAuth" class="flex items-center gap-2">
+              <div v-if="showEmailAuth" class="flex items-center gap-2">
                 <a-switch
                   v-model:checked="subscribe"
                   size="small"

@@ -11,6 +11,22 @@ const { t } = useI18n()
 
 const route = useRoute()
 
+const { appInfo } = useGlobal()
+
+const showEmailAuth = computed(() => !appInfo.value.disableEmailAuth && !appInfo.value.corporateSsoHideEmailAuth)
+const corporateSsoLoginUrl = computed(() => {
+  const url = new URL(appInfo.value.corporateSsoLoginUrl || `${appInfo.value.ncSiteUrl}/auth/corporate`, appInfo.value.ncSiteUrl)
+  const nextPath = Array.isArray(route.query.continueAfterSignIn)
+    ? route.query.continueAfterSignIn[0]
+    : route.query.continueAfterSignIn
+
+  if (nextPath) {
+    url.searchParams.set('next', nextPath)
+  }
+
+  return url.toString()
+})
+
 const form = reactive({
   password: '',
   newPassword: '',
@@ -61,14 +77,14 @@ function resetError() {
           <div class="self-center flex flex-col justify-center items-center text-center gap-2">
             <h1 class="prose-2xl font-bold my-4 w-full">{{ $t('title.resetPassword') }}</h1>
 
-            <div class="prose-sm text-success flex items-center leading-8 gap-2">
+            <div v-if="showEmailAuth" class="prose-sm text-success flex items-center leading-8 gap-2">
               {{ $t('msg.info.passwordRecovery.success') }} <ClaritySuccessLine />
             </div>
 
             <nuxt-link to="/signin">{{ $t('general.signIn') }}</nuxt-link>
           </div>
 
-          <a-form ref="formValidator" layout="vertical" :model="form" no-style @finish="resetPassword">
+          <a-form v-if="showEmailAuth" ref="formValidator" layout="vertical" :model="form" no-style @finish="resetPassword">
             <Transition name="layout">
               <div v-if="error" class="self-center mb-4 bg-red-500 text-white rounded-lg w-3/4 mx-auto p-1">
                 <div class="flex items-center gap-2 justify-center">
@@ -114,6 +130,20 @@ function resetError() {
               </NcButton>
             </div>
           </a-form>
+
+          <div v-else class="self-center flex flex-col gap-4 items-center justify-center w-full">
+            <a
+              v-if="appInfo.corporateSsoAuthEnabled"
+              :href="corporateSsoLoginUrl"
+              class="scaling-btn bg-opacity-100 after:(!bg-nc-bg-default) !text-primary !no-underline"
+            >
+              <span class="flex items-center gap-2">
+                <MdiLogin />
+
+                {{ $t('labels.signInWithProvider', { provider: appInfo.corporateSsoProviderName || 'Company Login' }) }}
+              </span>
+            </a>
+          </div>
         </div>
       </div>
     </NuxtLayout>

@@ -67,6 +67,13 @@ export const useWorkspace = defineStore('workspaceStore', () => {
   )
 
   const activeWorkspaceId = computed(() => {
+    const typeOrId = route.value.params.typeOrId
+    const routeWorkspaceId = Array.isArray(typeOrId) ? typeOrId[0] : typeOrId
+
+    if (isString(routeWorkspaceId) && routeWorkspaceId && !['nc', 'base'].includes(routeWorkspaceId)) {
+      return routeWorkspaceId
+    }
+
     return appInfo.value.defaultWorkspaceId || 'nc'
   })
 

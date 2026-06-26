@@ -20,7 +20,9 @@ const { refreshCommandPalette } = useCommandPalette()
 
 const { refreshViewTabTitle } = useViewsStore()
 
-const { activeTable, baseTables } = storeToRefs(useTablesStore())
+const tablesStore = useTablesStore()
+const { activeTable, baseTables } = storeToRefs(tablesStore)
+const { moveTableToFolder } = tablesStore
 
 const { isSharedBase } = storeToRefs(useBase())
 
@@ -137,7 +139,7 @@ const updateSourceTitle = async (sourceId: string) => {
  * @see {@link packages/nc-gui/components/smartsheet/topbar/TableListDropdown.vue} for a similar implementation
  * of table creation dialog. If this function is updated, consider updating the other implementation as well.
  */
-function openTableCreateDialog(sourceIndex?: number | undefined, showSourceSelector = true) {
+function openTableCreateDialog(sourceIndex?: number | undefined, showSourceSelector = true, folderId?: string | null) {
   const isOpen = ref(true)
   let sourceId = base.value!.sources?.[0].id
   if (typeof sourceIndex === 'number') {
@@ -155,10 +157,22 @@ function openTableCreateDialog(sourceIndex?: number | undefined, showSourceSelec
     'onUpdate:modelValue': () => closeDialog(),
   })
 
-  function closeDialog(table?: TableType) {
+  async function closeDialog(table?: TableType) {
     isOpen.value = false
 
     if (!table) return
+
+    if (folderId && table.id && base.value?.id) {
+      try {
+        await moveTableToFolder({
+          baseId: base.value.id,
+          tableId: table.id as string,
+          folderId,
+        })
+      } catch (e: any) {
+        message.error(await extractSdkResponseErrorMsg(e))
+      }
+    }
 
     isExpanded.value = true
 
@@ -240,7 +254,12 @@ onKeyStroke('Escape', () => {
         <div class="flex-1 overflow-y-auto overflow-x-hidden flex flex-col" :class="{ 'mb-[20px]': isSharedBase }">
           <div v-if="base?.sources?.[0]?.enabled" class="flex-1">
             <div class="transition-height duration-200">
-              <DashboardTreeViewTableList :base="base" :base-id="baseId" :source-index="0" />
+              <DashboardTreeViewTableList
+                :base="base"
+                :base-id="baseId"
+                :source-index="0"
+                @create-table="openTableCreateDialog(0, true, $event)"
+              />
             </div>
           </div>
 
@@ -470,7 +489,12 @@ onKeyStroke('Escape', () => {
                       :key="`sortable-${source.id}-${source.id && source.id in keys ? keys[source.id] : '0'}`"
                       :nc-source="source.id"
                     >
-                      <DashboardTreeViewTableList :base="base" :base-id="baseId" :source-index="sourceIndex" />
+                      <DashboardTreeViewTableList
+                        :base="base"
+                        :base-id="baseId"
+                        :source-index="sourceIndex"
+                        @create-table="openTableCreateDialog(sourceIndex, false, $event)"
+                      />
                     </div>
                   </a-collapse-panel>
                 </a-collapse>

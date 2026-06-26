@@ -9,6 +9,7 @@ interface Props {
   onValidate: (view: ViewType) => boolean | string
   isDragging?: boolean
   isInSection?: boolean
+  level?: number
 }
 
 interface Emits {
@@ -28,7 +29,10 @@ interface Emits {
   ): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  isInSection: false,
+  level: 0,
+})
 
 const emits = defineEmits<Emits>()
 
@@ -287,6 +291,26 @@ const viewModeInfo = computed(() => {
   }
 })
 
+const viewPaddingInlineStart = computed(() => {
+  const basePadding = isDefaultBaseLocal.value
+    ? props.isInSection
+      ? 54
+      : 30
+    : props.isInSection
+    ? 82
+    : 56
+
+  return `${basePadding + props.level * 16}px`
+})
+
+const viewNodeStyle = computed(() => {
+  if (!props.level) return undefined
+
+  return {
+    paddingInlineStart: viewPaddingInlineStart.value,
+  }
+})
+
 watch(isDropdownOpen, async () => {
   if (!isDropdownOpen.value) return
 
@@ -298,11 +322,12 @@ watch(isDropdownOpen, async () => {
   <div
     class="nc-sidebar-node !min-h-7 !max-h-7 !my-0.5 select-none group text-nc-content-gray-subtle text-bodyDefaultSm !flex !items-center hover:(!bg-nc-bg-gray-medium !text-nc-content-gray) cursor-pointer"
     :class="{
-      '!pl-7.5 rtl:(!pr-7.5 !pl-0)': isDefaultBaseLocal && !isInSection,
-      '!pl-14 rtl:(!pr-14 !pl-0)': !isDefaultBaseLocal && !isInSection,
-      '!pl-13.5 rtl:(!pr-13.5 !pl-0)': isDefaultBaseLocal && isInSection,
-      '!pl-20.5 rtl:(!pr-20.5 !pl-0)': !isDefaultBaseLocal && isInSection,
+      '!pl-7.5 rtl:(!pr-7.5 !pl-0)': !level && isDefaultBaseLocal && !isInSection,
+      '!pl-14 rtl:(!pr-14 !pl-0)': !level && !isDefaultBaseLocal && !isInSection,
+      '!pl-13.5 rtl:(!pr-13.5 !pl-0)': !level && isDefaultBaseLocal && isInSection,
+      '!pl-20.5 rtl:(!pr-20.5 !pl-0)': !level && !isDefaultBaseLocal && isInSection,
     }"
+    :style="viewNodeStyle"
     :data-testid="`view-sidebar-view-${vModel.alias || vModel.title}`"
     @click.prevent="handleOnClick"
   >

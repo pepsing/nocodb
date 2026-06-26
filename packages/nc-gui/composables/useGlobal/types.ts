@@ -19,6 +19,12 @@ export interface AppInfo {
   env: string
   githubAuthEnabled: boolean
   googleAuthEnabled: boolean
+  corporateSsoAuthEnabled: boolean
+  corporateSsoProviderName: string | null
+  corporateSsoLoginUrl: string | null
+  corporateSsoHideEmailAuth: boolean
+  corporateSsoMode: 'local' | 'corporate_sso' | 'hybrid'
+  corporateSsoConfigError: string | null
   oidcAuthEnabled: boolean
   oidcProviderName: string | null
   ncMin: boolean

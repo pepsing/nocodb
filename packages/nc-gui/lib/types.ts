@@ -316,7 +316,20 @@ type NcButtonSize = 'xxsmall' | 'xsmall' | 'small' | 'medium' | 'xs'
 interface SidebarTableNode extends TableType {
   isMetaLoading?: boolean
   isViewsLoading?: boolean
-  views: ViewType[]
+  views?: ViewType[]
+}
+
+interface ProjectFolderType {
+  id: string
+  fk_workspace_id?: string
+  base_id: string
+  source_id?: string | null
+  fk_parent_id?: string | null
+  title: string
+  description?: string | null
+  order?: number | null
+  created_at?: string
+  updated_at?: string
 }
 
 interface UsersSortType {
@@ -1144,6 +1157,7 @@ export type {
   ViewPageType,
   NcButtonSize,
   SidebarTableNode,
+  ProjectFolderType,
   UsersSortType,
   CommandPaletteType,
   CalendarRangeType,

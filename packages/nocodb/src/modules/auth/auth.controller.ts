@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -12,7 +13,7 @@ import {
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import { extractRolesObj } from 'nocodb-sdk';
+import { OrgUserRoles, extractRolesObj } from 'nocodb-sdk';
 import * as ejs from 'ejs';
 import { PresignedUrl } from 'src/models';
 import type { AppConfig } from '~/interface/config';
@@ -28,6 +29,8 @@ import { Acl } from '~/middlewares/extract-ids/extract-ids.middleware';
 import { MetaApiLimiterGuard } from '~/guards/meta-api-limiter.guard';
 import { PublicApiLimiterGuard } from '~/guards/public-api-limiter.guard';
 import { NcRequest } from '~/interface/config';
+import { CorporateSsoService } from '~/modules/auth/corporate-sso.service';
+import { EmailAuthGuard } from '~/modules/auth/email-auth.guard';
 
 @Controller()
 export class AuthController {
@@ -35,7 +38,21 @@ export class AuthController {
     protected readonly usersService: UsersService,
     protected readonly appHooksService: AppHooksService,
     protected readonly config: ConfigService<AppConfig>,
+    protected readonly corporateSsoService: CorporateSsoService,
   ) {}
+
+  private isEmailAuthDisabled() {
+    return (
+      this.config.get('auth', { infer: true }).disableEmailAuth ||
+      this.corporateSsoService.shouldDisableEmailAuth()
+    );
+  }
+
+  private assertEmailAuthEnabled() {
+    if (this.isEmailAuthDisabled()) {
+      NcError.forbidden('Email authentication is disabled');
+    }
+  }
 
   @Post([
     '/auth/user/signup',
@@ -46,9 +63,7 @@ export class AuthController {
   @UseGuards(PublicApiLimiterGuard)
   @HttpCode(200)
   async signup(@Req() req: NcRequest, @Res() res: Response): Promise<any> {
-    if (this.config.get('auth', { infer: true }).disableEmailAuth) {
-      NcError.forbidden('Email authentication is disabled');
-    }
+    this.assertEmailAuthEnabled();
     const result = await this.usersService.signup({
       body: req.body,
       req,
@@ -85,12 +100,10 @@ export class AuthController {
     '/api/v1/auth/user/signin',
     '/api/v2/auth/user/signin',
   ])
-  @UseGuards(PublicApiLimiterGuard, AuthGuard('local'))
+  @UseGuards(PublicApiLimiterGuard, EmailAuthGuard)
   @HttpCode(200)
   async signin(@Req() req: NcRequest, @Res() res: Response) {
-    if (this.config.get('auth', { infer: true }).disableEmailAuth) {
-      NcError.forbidden('Email authentication is disabled');
-    }
+    this.assertEmailAuthEnabled();
     await this.setRefreshToken({ req, res });
     const result = await this.usersService.login(req.user, req);
     setAuthCookie(res, result.token);
@@ -127,6 +140,99 @@ export class AuthController {
   @UseGuards(PublicApiLimiterGuard, AuthGuard('google'))
   googleAuthenticate() {
     // google strategy will take care the request
+  }
+
+  @Get(['/auth/corporate', '/api/v1/auth/corporate/login'])
+  @UseGuards(PublicApiLimiterGuard)
+  async corporateAuthenticate(
+    @Req() req: NcRequest,
+    @Res() res: Response,
+    @Query('next') next?: string,
+    @Query('continueAfterSignIn') continueAfterSignIn?: string,
+  ) {
+    const { loginUrl, state } =
+      await this.corporateSsoService.buildProviderLoginRedirect(
+        req,
+        next || continueAfterSignIn,
+      );
+    this.corporateSsoService.setStateCookie(req, res, state);
+    return res.redirect(loginUrl);
+  }
+
+  @Get(['/auth/corporate/callback', '/api/v1/auth/corporate/callback'])
+  @UseGuards(PublicApiLimiterGuard)
+  async corporateCallback(
+    @Req() req: NcRequest,
+    @Res() res: Response,
+    @Query('code') code?: string,
+    @Query('state') state?: string,
+    @Query('sso_state') callbackState?: string,
+    @Query('next') next?: string,
+    @Query('error') error?: string,
+    @Query('error_description') errorDescription?: string,
+  ) {
+    try {
+      if (error) {
+        NcError.unauthorized(errorDescription || error);
+      }
+
+      const user = await this.corporateSsoService.loginFromCallback({
+        req,
+        code,
+        state,
+        callbackState,
+        next,
+      });
+
+      req.user = user;
+      await this.setRefreshToken({ req, res });
+
+      const result = await this.usersService.login(req.user, req);
+      setAuthCookie(res, result.token);
+      this.corporateSsoService.clearStateCookie(res);
+
+      return res.redirect(
+        this.corporateSsoService.resolveFrontendRedirectUrl(
+          req,
+          (user as any).corporateSsoNextPath,
+        ),
+      );
+    } catch (e) {
+      this.corporateSsoService.clearStateCookie(res);
+      return res.redirect(
+        this.corporateSsoService.resolveFrontendRedirectUrl(
+          req,
+          `/signin?corporateSsoError=${encodeURIComponent(
+            e?.message || 'Corporate SSO failed',
+          )}`,
+        ),
+      );
+    }
+  }
+
+  @Get('/api/v1/auth/corporate/mappings')
+  @UseGuards(MetaApiLimiterGuard, GlobalGuard)
+  @Acl('corporateSsoMappingList', {
+    scope: 'org',
+    allowedRoles: [OrgUserRoles.SUPER_ADMIN],
+    blockApiTokenAccess: true,
+    blockOAuthTokenAccess: true,
+  })
+  async corporateMappingList(@Req() req: NcRequest) {
+    return await this.corporateSsoService.listMappings(req.query);
+  }
+
+  @Post('/api/v1/auth/corporate/mappings')
+  @UseGuards(MetaApiLimiterGuard, GlobalGuard)
+  @Acl('corporateSsoMappingUpsert', {
+    scope: 'org',
+    allowedRoles: [OrgUserRoles.SUPER_ADMIN],
+    blockApiTokenAccess: true,
+    blockOAuthTokenAccess: true,
+  })
+  @HttpCode(200)
+  async corporateMappingUpsert(@Body() body: any) {
+    return await this.corporateSsoService.upsertMapping(body);
   }
 
   @Get([
@@ -173,6 +279,7 @@ export class AuthController {
   })
   @HttpCode(200)
   async passwordChange(@Req() req: NcRequest, @Res() res): Promise<any> {
+    this.assertEmailAuthEnabled();
     if (!(req as any).isAuthenticated?.()) {
       NcError.forbidden('Not allowed');
     }
@@ -201,6 +308,7 @@ export class AuthController {
   @UseGuards(PublicApiLimiterGuard)
   @HttpCode(200)
   async passwordForgot(@Req() req: NcRequest): Promise<any> {
+    this.assertEmailAuthEnabled();
     await this.usersService.passwordForgot({
       siteUrl: (req as any).ncSiteUrl,
       body: req.body,
@@ -219,6 +327,7 @@ export class AuthController {
   @UseGuards(PublicApiLimiterGuard)
   @HttpCode(200)
   async tokenValidate(@Param('tokenId') tokenId: string): Promise<any> {
+    this.assertEmailAuthEnabled();
     await this.usersService.tokenValidate({
       token: tokenId,
     });
@@ -238,6 +347,7 @@ export class AuthController {
     @Param('tokenId') tokenId: string,
     @Body() body: any,
   ): Promise<any> {
+    this.assertEmailAuthEnabled();
     await this.usersService.passwordReset({
       token: tokenId,
       body: body,
@@ -258,6 +368,7 @@ export class AuthController {
     @Req() req: NcRequest,
     @Param('tokenId') tokenId: string,
   ): Promise<any> {
+    this.assertEmailAuthEnabled();
     await this.usersService.emailVerification({
       token: tokenId,
       req,
@@ -277,6 +388,7 @@ export class AuthController {
     @Res() res: Response,
     @Param('tokenId') tokenId: string,
   ): Promise<any> {
+    this.assertEmailAuthEnabled();
     try {
       res.send(
         ejs.render(

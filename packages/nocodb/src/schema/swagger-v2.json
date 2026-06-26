@@ -20499,6 +20499,11 @@
             "description": "Table description",
             "type": "string"
           },
+          "fk_folder_id": {
+            "description": "Project folder ID for placing this table in the project tree",
+            "nullable": true,
+            "type": "string"
+          },
           "title": {
             "description": "Table title",
             "example": "My Table",

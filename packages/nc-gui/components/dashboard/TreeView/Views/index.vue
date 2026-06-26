@@ -1,3 +1,14 @@
+<script setup lang="ts">
+withDefaults(
+  defineProps<{
+    level?: number
+  }>(),
+  {
+    level: 0,
+  },
+)
+</script>
+
 <template>
-  <DashboardTreeViewViewsList />
+  <DashboardTreeViewViewsList :level="level" />
 </template>

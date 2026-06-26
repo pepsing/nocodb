@@ -89,6 +89,7 @@ export default class Model implements TableType {
   export_enabled: BoolType;
   id: string;
   order: number;
+  fk_folder_id?: string | null;
   parent_id: string;
   password: string;
   pin: BoolType;
@@ -257,6 +258,7 @@ export default class Model implements TableType {
       'description',
       'mm',
       'order',
+      'fk_folder_id',
       'type',
       'id',
       'meta',
@@ -1100,6 +1102,33 @@ export default class Model implements TableType {
 
     await NocoCache.update(context, `${CacheScope.MODEL}:${tableId}`, {
       order,
+    });
+
+    return res;
+  }
+
+  static async updateFolder(
+    context: NcContext,
+    tableId: string,
+    fkFolderId: string | null,
+    ncMeta = Noco.ncMeta,
+  ) {
+    const res = await ncMeta.metaUpdate(
+      context.workspace_id,
+      context.base_id,
+      MetaTable.MODELS,
+      {
+        fk_folder_id: fkFolderId,
+      },
+      tableId,
+    );
+
+    await NocoCache.update(context, `${CacheScope.MODEL}:${tableId}`, {
+      fk_folder_id: fkFolderId,
+    });
+
+    cleanCommandPaletteCache(context.workspace_id).catch(() => {
+      logger.error('Failed to clean command palette cache');
     });
 
     return res;

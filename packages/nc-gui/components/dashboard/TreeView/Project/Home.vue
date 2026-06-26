@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import DlgProjectFolderCreate from '~/components/dlg/ProjectFolder/Create.vue'
 import Table from '~/components/dashboard/TreeView/Table/index.vue'
 
 const sidebarStore = useSidebarStore()
@@ -23,6 +24,26 @@ async function addNewProjectChildEntity(showSourceSelector = true) {
   if (!projectNodeRef.value) return
 
   projectNodeRef.value?.addNewProjectChildEntity?.(showSourceSelector)
+}
+
+function addNewProjectFolder() {
+  const sourceId = base.value?.sources?.[0]?.id
+  if (!base.value?.id || !sourceId) return
+
+  const isOpen = ref(true)
+
+  const { close } = useDialog(DlgProjectFolderCreate, {
+    'modelValue': isOpen,
+    'baseId': base.value.id,
+    'sourceId': sourceId,
+    'onUpdate:modelValue': closeDialog,
+  })
+
+  function closeDialog() {
+    isOpen.value = false
+
+    close(1000)
+  }
 }
 
 const isVisibleCreateNew = ref(false)
@@ -83,6 +104,7 @@ const hasTableCreatePermission = computed(() => {
               <DashboardTreeViewProjectCreateNewMenu
                 v-model:visible="isVisibleCreateNew"
                 @new-table="addNewProjectChildEntity()"
+                @new-folder="addNewProjectFolder"
               />
             </template>
           </NcDropdown>

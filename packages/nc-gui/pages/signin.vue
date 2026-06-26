@@ -17,6 +17,21 @@ const { t } = useI18n()
 useSidebar('nc-left-sidebar', { hasSidebar: false })
 
 const formValidator = ref()
+const showEmailAuth = computed(() => !appInfo.value.disableEmailAuth && !appInfo.value.corporateSsoHideEmailAuth)
+const corporateSsoError = computed(() => (typeof route.query.corporateSsoError === 'string' ? route.query.corporateSsoError : ''))
+const authError = computed(() => error.value || corporateSsoError.value || appInfo.value.corporateSsoConfigError)
+const corporateSsoLoginUrl = computed(() => {
+  const url = new URL(appInfo.value.corporateSsoLoginUrl || `${appInfo.value.ncSiteUrl}/auth/corporate`, appInfo.value.ncSiteUrl)
+  const nextPath = Array.isArray(route.query.continueAfterSignIn)
+    ? route.query.continueAfterSignIn[0]
+    : route.query.continueAfterSignIn
+
+  if (nextPath) {
+    url.searchParams.set('next', nextPath)
+  }
+
+  return url.toString()
+})
 
 const form = reactive({
   email: '',
@@ -93,17 +108,17 @@ function navigateForgotPassword() {
 
           <h1 class="prose-2xl font-bold self-center my-4">{{ $t('general.signIn') }}</h1>
 
-          <a-form ref="formValidator" :model="form" layout="vertical" no-style @finish="signIn">
-            <template v-if="!appInfo.disableEmailAuth">
-              <Transition name="layout">
-                <div v-if="error" class="self-center mb-4 bg-red-500 text-white rounded-lg w-3/4 mx-auto p-1">
-                  <div class="flex items-center gap-2 justify-center">
-                    <MaterialSymbolsWarning />
-                    <div class="break-words">{{ error }}</div>
-                  </div>
-                </div>
-              </Transition>
+          <Transition name="layout">
+            <div v-if="authError" class="self-center mb-4 bg-red-500 text-white rounded-lg w-3/4 mx-auto p-1">
+              <div class="flex items-center gap-2 justify-center">
+                <MaterialSymbolsWarning />
+                <div class="break-words">{{ authError }}</div>
+              </div>
+            </div>
+          </Transition>
 
+          <a-form ref="formValidator" :model="form" layout="vertical" no-style @finish="signIn">
+            <template v-if="showEmailAuth">
               <a-form-item :label="$t('labels.email')" name="email" :rules="formRules.email">
                 <a-input
                   v-model:value="form.email"
@@ -136,7 +151,7 @@ function navigateForgotPassword() {
             </template>
 
             <div class="self-center flex flex-col flex-wrap gap-4 items-center mt-4 justify-center">
-              <template v-if="!appInfo.disableEmailAuth">
+              <template v-if="showEmailAuth">
                 <button data-testid="nc-form-signin__submit" class="scaling-btn bg-opacity-100" type="submit">
                   <span class="flex items-center gap-2">
                     <component :is="iconMap.signin" />
@@ -144,6 +159,17 @@ function navigateForgotPassword() {
                   </span>
                 </button>
               </template>
+              <a
+                v-if="appInfo.corporateSsoAuthEnabled"
+                :href="corporateSsoLoginUrl"
+                class="scaling-btn bg-opacity-100 after:(!bg-nc-bg-default) !text-primary !no-underline"
+              >
+                <span class="flex items-center gap-2">
+                  <MdiLogin />
+
+                  {{ $t('labels.signInWithProvider', { provider: appInfo.corporateSsoProviderName || 'Company Login' }) }}
+                </span>
+              </a>
               <a
                 v-if="appInfo.googleAuthEnabled"
                 :href="`${appInfo.ncSiteUrl}/auth/google`"
@@ -165,7 +191,7 @@ function navigateForgotPassword() {
                     <span class="flex items-center gap-2">
                       <MdiLogin />
 
-                      <template v-if="!appInfo.disableEmailAuth">
+                      <template v-if="showEmailAuth">
                         {{ $t('labels.signUpWithProvider', { provider: appInfo.oidcProviderName || 'OpenID Connect' }) }}
                       </template>
                       <template v-else>
@@ -176,11 +202,11 @@ function navigateForgotPassword() {
                 </a>
               </div>
 
-              <div v-if="!appInfo.inviteOnlySignup" class="text-end prose-sm">
+              <div v-if="showEmailAuth && !appInfo.inviteOnlySignup" class="text-end prose-sm">
                 {{ $t('msg.info.signUp.dontHaveAccount') }}
                 <nuxt-link @click="navigateSignUp">{{ $t('general.signUp') }}</nuxt-link>
               </div>
-              <template v-if="!appInfo.disableEmailAuth">
+              <template v-if="showEmailAuth">
                 <div class="md:hidden">
                   <nuxt-link class="prose-sm" @click="navigateForgotPassword">
                     {{ $t('msg.info.signUp.forgotPassword') }}

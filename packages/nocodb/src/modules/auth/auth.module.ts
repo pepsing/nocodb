@@ -11,6 +11,8 @@ import { BaseViewStrategy } from '~/strategies/base-view.strategy/base-view.stra
 import { GoogleStrategyProvider } from '~/strategies/google.strategy/google.strategy';
 import { AuthService } from '~/modules/auth/auth.service';
 import { AuthController } from '~/modules/auth/auth.controller';
+import { CorporateSsoService } from '~/modules/auth/corporate-sso.service';
+import { EmailAuthGuard } from '~/modules/auth/email-auth.guard';
 
 export const authModuleMetadata = {
   imports: [PassportModule, NocoModule],
@@ -25,6 +27,8 @@ export const authModuleMetadata = {
     BaseViewStrategy,
     BasicStrategy,
     GoogleStrategyProvider,
+    CorporateSsoService,
+    EmailAuthGuard,
   ],
   exports: [],
 };

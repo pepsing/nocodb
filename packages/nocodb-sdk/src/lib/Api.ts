@@ -7124,10 +7124,14 @@ export interface TableType {
   mm?: BoolType;
   /** The order of the list of tables */
   order?: number;
+  /** Project folder ID for placing this table in the project tree */
+  fk_folder_id?: string | null;
   /** Currently not in use */
   pinned?: BoolType;
   /** Unique Base ID */
   base_id?: string;
+  /** Unique Workspace ID */
+  fk_workspace_id?: string;
   /** Table Description */
   description?: TextOrNullType;
   /** Table Name. Prefix will be added for XCDB bases. */
@@ -7171,6 +7175,8 @@ export interface TableReqType {
    * @example 1
    */
   order?: number;
+  /** Project folder ID for placing this table in the project tree */
+  fk_folder_id?: string | null;
   /**
    * Table name
    * @example my_table
@@ -10997,6 +11003,8 @@ export class Api<
         base_id?: string;
         /** Model for Meta */
         meta?: MetaType;
+        /** Project folder ID for placing this table in the project tree */
+        fk_folder_id?: string | null;
       },
       params: RequestParams = {}
     ) =>

@@ -1,6 +1,6 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
-import { type TableType } from 'nocodb-sdk'
-import type { SidebarTableNode } from '~/lib/types'
+import { ContentType, type TableType } from 'nocodb-sdk'
+import type { ProjectFolderType, SidebarTableNode } from '~/lib/types'
 import { DlgTableCreate } from '#components'
 
 export const useTablesStore = defineStore('tablesStore', () => {
@@ -13,6 +13,7 @@ export const useTablesStore = defineStore('tablesStore', () => {
   const route = router.currentRoute
 
   const baseTables = ref<Map<string, SidebarTableNode[]>>(new Map())
+  const baseFolders = ref<Map<string, ProjectFolderType[]>>(new Map())
   const basesStore = useBases()
   // const baseStore = useBase()
 
@@ -62,6 +63,8 @@ export const useTablesStore = defineStore('tablesStore', () => {
       includeM2M: includeM2M.value,
     })
 
+    await loadProjectFolders(baseId, force)
+
     tables.list?.forEach((t) => {
       let meta = t.meta
       if (typeof meta === 'string') {
@@ -78,6 +81,110 @@ export const useTablesStore = defineStore('tablesStore', () => {
     })
 
     baseTables.value.set(baseId, tables.list || [])
+  }
+
+  const loadProjectFolders = async (baseId: string, force = false) => {
+    if (!force && baseFolders.value.get(baseId)) {
+      return
+    }
+
+    const folders = await api.request<{ list: ProjectFolderType[] }, any>({
+      path: `/api/v1/db/meta/projects/${baseId}/folders`,
+      method: 'GET',
+      format: 'json',
+    })
+
+    baseFolders.value.set(baseId, folders.list || [])
+  }
+
+  const createProjectFolder = async ({
+    baseId,
+    sourceId,
+    parentId,
+    title,
+  }: {
+    baseId: string
+    sourceId?: string
+    parentId?: string | null
+    title?: string
+  }) => {
+    const folder = await api.request<ProjectFolderType, any>({
+      path: `/api/v1/db/meta/projects/${baseId}/folders`,
+      method: 'POST',
+      type: ContentType.Json,
+      format: 'json',
+      body: {
+        title: title || 'New folder',
+        source_id: sourceId,
+        fk_parent_id: parentId ?? null,
+      },
+    })
+
+    await loadProjectFolders(baseId, true)
+    refreshCommandPalette()
+
+    return folder
+  }
+
+  const updateProjectFolder = async ({
+    baseId,
+    folderId,
+    title,
+    parentId,
+  }: {
+    baseId: string
+    folderId: string
+    title?: string
+    parentId?: string | null
+  }) => {
+    const body: Partial<ProjectFolderType> = {}
+    if (typeof title === 'string') body.title = title
+    if (parentId !== undefined) body.fk_parent_id = parentId
+
+    const folder = await api.request<ProjectFolderType, any>({
+      path: `/api/v1/db/meta/projects/${baseId}/folders/${folderId}`,
+      method: 'PATCH',
+      type: ContentType.Json,
+      format: 'json',
+      body,
+    })
+
+    await loadProjectFolders(baseId, true)
+    refreshCommandPalette()
+
+    return folder
+  }
+
+  const deleteProjectFolder = async ({ baseId, folderId }: { baseId: string; folderId: string }) => {
+    await api.request<void, any>({
+      path: `/api/v1/db/meta/projects/${baseId}/folders/${folderId}`,
+      method: 'DELETE',
+      format: 'json',
+    })
+
+    await loadProjectFolders(baseId, true)
+    refreshCommandPalette()
+  }
+
+  const moveTableToFolder = async ({
+    baseId,
+    tableId,
+    folderId,
+  }: {
+    baseId: string
+    tableId: string
+    folderId?: string | null
+  }) => {
+    const table = baseTables.value.get(baseId)?.find((t) => t.id === tableId)
+    if (table) table.fk_folder_id = folderId ?? null
+
+    await api.dbTable.update(tableId, {
+      base_id: baseId,
+      fk_folder_id: folderId ?? null,
+    })
+
+    await loadProjectTables(baseId, true)
+    refreshCommandPalette()
   }
 
   const addTable = (baseId: string, table: TableType) => {
@@ -297,7 +404,13 @@ export const useTablesStore = defineStore('tablesStore', () => {
 
   return {
     baseTables,
+    baseFolders,
     loadProjectTables,
+    loadProjectFolders,
+    createProjectFolder,
+    updateProjectFolder,
+    deleteProjectFolder,
+    moveTableToFolder,
     addTable,
     activeTable,
     activeTables,

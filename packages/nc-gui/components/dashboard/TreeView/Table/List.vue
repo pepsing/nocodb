@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import type { BaseType, TableType } from 'nocodb-sdk'
 import Sortable from 'sortablejs'
+import FolderNode from '../Folder/Node.vue'
 import TableNode from './Node.vue'
+import DlgProjectFolderCreate from '~/components/dlg/ProjectFolder/Create.vue'
+import type { ProjectFolderType, SidebarTableNode } from '~/lib/types'
+
+interface FolderTreeNode extends ProjectFolderType {
+  folders: FolderTreeNode[]
+  tables: SidebarTableNode[]
+}
 
 const props = withDefaults(
   defineProps<{
@@ -29,15 +37,31 @@ const { isUIAllowed } = useRoles()
 
 const { openedProject, baseHomeSearchQuery } = storeToRefs(useBases())
 
-const { baseTables } = storeToRefs(useTablesStore())
+const tablesStore = useTablesStore()
+const { baseTables, baseFolders } = storeToRefs(tablesStore)
+const { updateProjectFolder, deleteProjectFolder } = tablesStore
 const tables = computed(() => baseTables.value.get(base.value.id!) ?? [])
+const folders = computed(() => baseFolders.value.get(base.value.id!) ?? [])
+
+const availableTables = computed(() => {
+  const currentSourceId = source.value?.id
+  if (!currentSourceId) return []
+
+  return tables.value.filter((table) => table.source_id === currentSourceId)
+})
+
+const availableFolders = computed(() => {
+  const currentSourceId = source.value?.id
+
+  return folders.value.filter((folder) => folder.source_id === currentSourceId || (!folder.source_id && sourceIndex.value === 0))
+})
 
 const { viewsByTable } = storeToRefs(useViewsStore())
 
 const { $api } = useNuxtApp()
 
 const tablesById = computed(() =>
-  tables.value.reduce<Record<string, TableType>>((acc, table) => {
+  tables.value.reduce<Record<string, SidebarTableNode>>((acc, table) => {
     acc[table.id!] = table
 
     return acc
@@ -55,6 +79,7 @@ const initSortable = (el: Element) => {
   const source_id = el.getAttribute('nc-source')
   if (!source_id) return
   if (isMobileMode.value) return
+  if (availableFolders.value.length) return
 
   if (sortables[source_id]) sortables[source_id].destroy()
   Sortable.create(el as HTMLLIElement, {
@@ -67,6 +92,7 @@ const initSortable = (el: Element) => {
 
       const itemEl = evt.item as HTMLLIElement
       const item = tablesById.value[itemEl.dataset.id as string]
+      if (!item) return
 
       // get the html collection of all list items
       const children: HTMLCollection = evt.to.children
@@ -84,10 +110,13 @@ const initSortable = (el: Element) => {
 
       // set new order value based on the new order of the items
       if (children.length - 1 === evt.newIndex) {
+        if (!itemBefore) return
         item.order = (itemBefore.order as number) + 1
       } else if (newIndex === 0) {
+        if (!itemAfter) return
         item.order = (itemAfter.order as number) / 2
       } else {
+        if (!itemBefore || !itemAfter) return
         item.order = ((itemBefore.order as number) + (itemAfter.order as number)) / 2
       }
 
@@ -133,6 +162,14 @@ const initSortable = (el: Element) => {
 }
 
 watchEffect(() => {
+  if (availableFolders.value.length) {
+    Object.values(sortables).forEach((sortable) => sortable.destroy())
+    for (const sourceId of Object.keys(sortables)) {
+      delete sortables[sourceId]
+    }
+    return
+  }
+
   if (menuRefs.value && isUIAllowed('viewCreateOrEdit')) {
     if (menuRefs.value instanceof HTMLElement) {
       initSortable(menuRefs.value)
@@ -142,32 +179,163 @@ watchEffect(() => {
   }
 })
 
-const availableTables = computed(() => {
-  return tables.value.filter((table) => table.source_id === base.value?.sources?.[sourceIndex.value].id)
+const folderOrTableSort = (a: ProjectFolderType | SidebarTableNode, b: ProjectFolderType | SidebarTableNode) => {
+  const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER
+  const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER
+
+  if (orderA !== orderB) return orderA - orderB
+
+  return `${a.title || ''}`.localeCompare(`${b.title || ''}`)
+}
+
+const tableMatchesSearch = (table: TableType) => {
+  if (!baseHomeSearchQuery.value) return true
+
+  if (searchCompare(table.title, baseHomeSearchQuery.value)) return true
+  if (!table.base_id || !table.id) return false
+  const key = `${table.base_id}:${table.id}`
+  return viewsByTable.value.get(key)?.some((view) => searchCompare(view.title, baseHomeSearchQuery.value)) ?? false
+}
+
+const tableTree = computed(() => {
+  const folderMap = new Map<string, FolderTreeNode>()
+  const rootFolders: FolderTreeNode[] = []
+  const rootTables: SidebarTableNode[] = []
+
+  for (const folder of availableFolders.value) {
+    folderMap.set(folder.id, {
+      ...folder,
+      folders: [],
+      tables: [],
+    })
+  }
+
+  for (const folder of folderMap.values()) {
+    if (folder.fk_parent_id && folderMap.has(folder.fk_parent_id)) {
+      folderMap.get(folder.fk_parent_id)!.folders.push(folder)
+    } else {
+      rootFolders.push(folder)
+    }
+  }
+
+  for (const table of availableTables.value) {
+    const folderId = table.fk_folder_id
+
+    if (folderId && folderMap.has(folderId)) {
+      folderMap.get(folderId)!.tables.push(table)
+    } else {
+      rootTables.push(table)
+    }
+  }
+
+  const sortFolder = (folder: FolderTreeNode) => {
+    folder.folders.sort(folderOrTableSort)
+    folder.tables.sort(folderOrTableSort)
+    folder.folders.forEach(sortFolder)
+  }
+
+  rootFolders.sort(folderOrTableSort)
+  rootFolders.forEach(sortFolder)
+  rootTables.sort(folderOrTableSort)
+
+  return {
+    folders: rootFolders,
+    rootTables,
+  }
 })
 
-const filteredAvailableTables = computed(() => {
-  return availableTables.value.filter((table) => {
-    if (searchCompare(table.title, baseHomeSearchQuery.value)) return true
-    if (!table.base_id || !table.id) return false
-    const key = `${table.base_id}:${table.id}`
-    return viewsByTable.value.get(key)?.some((view) => searchCompare(view.title, baseHomeSearchQuery.value))
-  })
+const filteredTableTree = computed(() => {
+  if (!baseHomeSearchQuery.value) return tableTree.value
+
+  const filterFolder = (folder: FolderTreeNode): FolderTreeNode | null => {
+    const childFolders = folder.folders.map(filterFolder).filter((child): child is FolderTreeNode => !!child)
+    const childTables = folder.tables.filter(tableMatchesSearch)
+
+    if (searchCompare(folder.title, baseHomeSearchQuery.value) || childFolders.length || childTables.length) {
+      return {
+        ...folder,
+        folders: childFolders,
+        tables: childTables,
+      }
+    }
+
+    return null
+  }
+
+  return {
+    folders: tableTree.value.folders.map(filterFolder).filter((folder): folder is FolderTreeNode => !!folder),
+    rootTables: tableTree.value.rootTables.filter(tableMatchesSearch),
+  }
 })
+
+const availableNodeCount = computed(() => availableTables.value.length + availableFolders.value.length)
+
+const visibleNodeCount = computed(() => filteredTableTree.value.folders.length + filteredTableTree.value.rootTables.length)
+
+const createFolder = async (parentId?: string | null) => {
+  if (!base.value?.id || !source.value?.id) return
+
+  const isOpen = ref(true)
+
+  const { close } = useDialog(DlgProjectFolderCreate, {
+    'modelValue': isOpen,
+    'baseId': base.value.id,
+    'sourceId': source.value.id,
+    'parentId': parentId,
+    'onUpdate:modelValue': closeDialog,
+  })
+
+  function closeDialog() {
+    isOpen.value = false
+
+    close(1000)
+  }
+}
+
+const renameFolder = async ({ folder, title }: { folder: ProjectFolderType; title: string }) => {
+  if (!base.value?.id) return
+
+  try {
+    await updateProjectFolder({
+      baseId: base.value.id,
+      folderId: folder.id,
+      title,
+    })
+  } catch (e: any) {
+    message.error(await extractSdkResponseErrorMsg(e))
+  }
+}
+
+const removeFolder = async (folder: ProjectFolderType) => {
+  if (!base.value?.id) return
+
+  try {
+    await deleteProjectFolder({
+      baseId: base.value.id,
+      folderId: folder.id,
+    })
+  } catch (e: any) {
+    message.error(await extractSdkResponseErrorMsg(e))
+  }
+}
+
+const createTable = (folderId?: string | null) => {
+  emits('createTable', folderId)
+}
 </script>
 
 <template>
   <div class="border-none sortable-list">
     <template v-if="base">
       <div
-        v-if="!availableTables.length && showCreateTableBtn"
+        v-if="!availableNodeCount && showCreateTableBtn"
         :class="{
           'text-nc-content-brand hover:text-nc-content-brand-disabled': openedProject?.id === baseId,
           'text-nc-content-gray-muted hover:text-nc-content-brand': openedProject?.id !== baseId,
         }"
         class="nc-create-table-btn flex flex-row items-center cursor-pointer rounded-md w-full"
         role="button"
-        @click="emits('createTable')"
+        @click="createTable()"
       >
         <div class="nc-project-home-section-item">
           <GeneralIcon icon="plus" />
@@ -182,7 +350,7 @@ const filteredAvailableTables = computed(() => {
       </div>
 
       <div
-        v-if="!availableTables.length || !filteredAvailableTables.length"
+        v-if="!availableNodeCount || !visibleNodeCount"
         class="py-0.5 text-nc-content-gray-muted font-normal"
         :class="{
           'nc-project-home-section-item': sourceIndex === 0,
@@ -190,20 +358,35 @@ const filteredAvailableTables = computed(() => {
         }"
       >
         {{
-          availableTables.length && !filteredAvailableTables.length
+          availableNodeCount && !visibleNodeCount
             ? $t('placeholder.noResultsFoundForYourSearch')
             : $t('placeholder.noTables')
         }}
       </div>
 
       <div
-        v-if="base.sources?.[sourceIndex] && base!.sources[sourceIndex].enabled"
+        v-if="source && source.enabled"
         ref="menuRefs"
         :key="`sortable-${source?.id}-${source?.id && source?.id in keys ? keys[source?.id] : '0'}`"
         :nc-source="source?.id"
       >
+        <FolderNode
+          v-for="folder of filteredTableTree.folders"
+          :key="folder.id"
+          :base="base"
+          :folder="folder"
+          :folders="folder.folders"
+          :tables="folder.tables"
+          :source-index="sourceIndex"
+          :level="0"
+          @create-folder="createFolder"
+          @create-table="createTable"
+          @rename-folder="renameFolder"
+          @delete-folder="removeFolder"
+        />
+
         <TableNode
-          v-for="table of filteredAvailableTables"
+          v-for="table of filteredTableTree.rootTables"
           :key="table.id"
           class="nc-tree-item text-sm"
           :data-order="table.order"

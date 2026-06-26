@@ -8,11 +8,12 @@ const props = withDefaults(
     base: BaseType
     table: SidebarTableNode
     sourceIndex: number
+    level?: number
   }>(),
-  { sourceIndex: 0 },
+  { sourceIndex: 0, level: 0 },
 )
 
-const { base, table, sourceIndex } = toRefs(props)
+const { base, table, sourceIndex, level } = toRefs(props)
 
 const { openTable: _openTable } = useTableNew({
   baseId: base.value.id!,
@@ -431,6 +432,8 @@ const enabledOptions = computed(() => {
 })
 
 const isMmTable = computed(() => !!table.value?.mm)
+
+const nodePaddingLeft = computed(() => `${(sourceIndex.value === 0 ? 8 : 32) + level.value * 16}px`)
 </script>
 
 <template>
@@ -439,6 +442,7 @@ const isMmTable = computed(() => !!table.value?.mm)
     :data-order="table.order"
     :data-id="table.id"
     :data-table-id="table.id"
+    data-tree-node-type="table"
     :class="[`nc-base-tree-tbl nc-base-tree-tbl-${table.title?.replaceAll(' ', '')}`]"
     :data-active="openedTableId === table.id"
   >
@@ -463,6 +467,7 @@ const isMmTable = computed(() => !!table.value?.mm)
             'pl-8 rtl:(pr-8 pl-0.75)': sourceIndex !== 0,
             'pl-2 xs:(pl-2) rtl:(pr-2 pl-0.75) rtl:xs:(pr-2 pl-0.75)': sourceIndex === 0,
           }"
+          :style="{ paddingLeft: nodePaddingLeft }"
           :data-testid="`nc-tbl-side-node-${table.title}`"
           @contextmenu="setMenuContext('table', table)"
           @click="onOpenTable"
@@ -837,7 +842,7 @@ const isMmTable = computed(() => !!table.value?.mm)
       :table-id="table.id"
       :title="table.title"
     />
-    <DashboardTreeViewViews v-if="isExpanded" />
+    <DashboardTreeViewViews v-if="isExpanded" :level="level" />
   </div>
 </template>
 

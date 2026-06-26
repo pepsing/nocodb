@@ -7,7 +7,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {})
 
-const emits = defineEmits(['update:visible', 'newTable'])
+const emits = defineEmits(['update:visible', 'newTable', 'newFolder'])
 
 const vVisible = useVModel(props, 'visible', emits)
 
@@ -25,11 +25,30 @@ const showBaseOption = (source: SourceType) => {
     ['airtableImport', 'csvImport', 'jsonImport', 'excelImport'].some((permission) => isUIAllowed(permission, { source }))
   )
 }
+
+const onNewFolder = () => {
+  emits('newFolder')
+  vVisible.value = false
+}
+
+const onNewTable = () => {
+  emits('newTable')
+  vVisible.value = false
+}
 </script>
 
 <template>
-  <NcMenu variant="large" data-testid="nc-home-create-new-menu" @click="vVisible = false">
-    <NcMenuItem inner-class="w-full" class="nc-menu-item-combo" data-testid="create-new-table" @click="emits('newTable')">
+  <NcMenu variant="large" data-testid="nc-home-create-new-menu">
+    <NcMenuItem inner-class="w-full" data-testid="create-new-folder" @click="onNewFolder">
+      <div class="w-full flex items-center">
+        <div class="flex-1 flex items-center gap-2 cursor-pointer">
+          <GeneralIcon icon="ncFolderPlus" class="!w-4 !h-4" />
+          {{ $t('labels.newFolder') }}
+        </div>
+      </div>
+    </NcMenuItem>
+
+    <NcMenuItem inner-class="w-full" class="nc-menu-item-combo" data-testid="create-new-table" @click="onNewTable">
       <div class="w-full flex items-center">
         <div class="flex-1 flex items-center gap-2 cursor-pointer">
           <GeneralIcon icon="table" class="!w-4 !h-4" />

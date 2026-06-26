@@ -3069,6 +3069,7 @@
     "dropToCreateRecords": "Drop here to create new records",
     "createNRecords": "Create {count} new record | Create {count} new records",
     "createTable": "Create Table",
+    "createFolder": "Create Folder",
     "createToken": "Create token",
     "createTable(s)": "Create Table(s)",
     "createTables": "Create {count} table",

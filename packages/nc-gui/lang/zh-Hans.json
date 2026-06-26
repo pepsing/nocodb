@@ -2965,6 +2965,7 @@
     "dropToCreateRecords": "拖放到此处以创建新记录",
     "createNRecords": "创建 {count} 新记录 | 创建 {count} 新记录",
     "createTable": "创建新的表格",
+    "createFolder": "创建新的文件夹",
     "createToken": "创建令牌",
     "createTable(s)": "创建表格",
     "createTables": "创建 {count} 个表格",

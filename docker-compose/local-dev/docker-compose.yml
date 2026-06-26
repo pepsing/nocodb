@@ -1,0 +1,74 @@
+name: nocodb-local-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nocodb-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nocodb
+      POSTGRES_PASSWORD: nocodb_dev_password
+      POSTGRES_DB: nocodb
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nocodb -d nocodb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: nocodb-dev-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: nocodb-dev-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: nocodb_minio
+      MINIO_ROOT_PASSWORD: nocodb_minio_secret
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    container_name: nocodb-dev-minio-init
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: nocodb_minio
+      MINIO_ROOT_PASSWORD: nocodb_minio_secret
+      MINIO_BUCKET: nocodb
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          sleep 2
+        done
+        mc mb --ignore-existing "local/$$MINIO_BUCKET"
+        mc anonymous set download "local/$$MINIO_BUCKET" || true
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

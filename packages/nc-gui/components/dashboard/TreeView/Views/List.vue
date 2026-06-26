@@ -11,6 +11,8 @@ interface Props {
   isInSection?: boolean
   /** Section ID this list belongs to — enables cross-section drag when set */
   sectionId?: string | null
+  /** Folder nesting level inherited from the table node */
+  level?: number
 }
 
 interface Emits {
@@ -37,6 +39,7 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   isInSection: false,
   sectionId: undefined,
+  level: 0,
 })
 
 const emits = defineEmits<Emits>()
@@ -100,6 +103,11 @@ const isDefaultSource = computed(() => {
   if (base.value?.sources?.length === 1) return true
   if (!source.value) return false
   return isDefaultBase(source.value)
+})
+
+const emptySectionPaddingLeft = computed(() => {
+  const basePadding = isDefaultSource.value ? 58 : 86
+  return `${basePadding + props.level * 16}px`
 })
 
 /** validate view title */
@@ -470,6 +478,7 @@ const filteredViews = computed(() => {
           'pl-14.5 xs:(pl-16) rtl:(pr-14.5 pl-0) rtl:xs:(pr-16 pl-0)': isDefaultSource,
           'pl-21.5 xs:(pl-23) rtl:(pr-21.5 pl-0) rtl:xs:(pr-23 pl-0)': !isDefaultSource,
         }"
+        :style="{ paddingLeft: emptySectionPaddingLeft }"
       >
         {{ $t('general.empty') }}
       </div>
@@ -481,6 +490,7 @@ const filteredViews = computed(() => {
         :is-dragging="dragging"
         :data-title="view.title"
         :is-in-section="isInSection"
+        :level="level"
         :class="{
           'bg-nc-bg-gray-medium': isMarked === view.id,
           'active': activeView?.id === view.id,
